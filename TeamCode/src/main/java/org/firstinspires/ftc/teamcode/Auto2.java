@@ -111,8 +111,10 @@ public class Auto2 extends LinearOpMode {
         while (positionX != abX || positionY != abY) {
             positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position;
             positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position;
-            double powerX = ((abX - positionX)*-1)/1000;
-            double powerY = ((abY - positionY)*-1)/1000;
+            //double powerX = ((abX - positionX)*-1)/1000;
+            double powerX = 0.53* Math.pow((abX - positionX) * -1, 1.0/11);
+            //double powerY = ((abY - positionY)*-1)/1000;
+            double powerY = 0.53* Math.pow((abY - positionY) * -1, 1.0/11);
             linearVelX = powerX;
             linearVelY = powerY;
             runTelemetry(drive);
