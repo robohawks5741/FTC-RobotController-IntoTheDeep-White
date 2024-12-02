@@ -23,7 +23,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
 
-@Autonomous(name = "#Auto")
+@Autonomous(name = "#New Auto")
 
 public class Auto2 extends LinearOpMode {
 
