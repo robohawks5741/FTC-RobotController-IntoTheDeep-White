@@ -22,6 +22,10 @@ android {
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
+
+    kotlinOptions {
+        jvmTarget = '11'
+    }
 }
 
 repositories {
@@ -39,10 +43,4 @@ dependencies {
     implementation "com.acmerobotics.dashboard:dashboard:0.4.16"
 
     implementation "org.jetbrains.kotlin:kotlin-reflect"
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
 }
