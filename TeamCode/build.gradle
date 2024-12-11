@@ -14,6 +14,7 @@
 // Include common definitions from above.
 apply from: '../build.common.gradle'
 apply from: '../build.dependencies.gradle'
+apply plugin: 'kotlin-android'
 
 android {
     namespace = 'org.firstinspires.ftc.teamcode'
@@ -36,4 +37,12 @@ dependencies {
     implementation "com.acmerobotics.roadrunner:core:1.0.0"
     implementation "com.acmerobotics.roadrunner:actions:1.0.0"
     implementation "com.acmerobotics.dashboard:dashboard:0.4.16"
+
+    implementation "org.jetbrains.kotlin:kotlin-reflect"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
