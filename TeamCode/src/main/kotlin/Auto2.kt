@@ -19,7 +19,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
 import kotlin.math.pow
 
-@Autonomous(name = "#Auto2Kt")
+@Autonomous(name = "#Auto Main Kt")
 class Auto2 : LinearOpMode() {
     private val lift: DcMotorEx? = null
     private val leftRotate: DcMotorEx? = null
@@ -91,12 +91,14 @@ class Auto2 : LinearOpMode() {
                 if (runtime <= 3.00) {
                     linearVelX = 1.0
                 }
+
+                //Final Drive Inputs
                 drive.setDrivePowers(
                     PoseVelocity2d(
                         Vector2d(linearVelX, linearVelY),
                         angularVel
                     )
-                ) //Final Drive Inputs
+                ) //End of function call
             }
         }
     }
@@ -114,19 +116,14 @@ class Auto2 : LinearOpMode() {
             positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
             positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
 
-            //double powerX = ((abX - positionX)*-1)/1000;
             val powerX: Double = 0.53 * ((abX - positionX) * -1).pow(1.0 / 11)
-
-            //double powerY = ((abY - positionY)*-1)/1000;
             val powerY: Double = 0.53 * ((abY - positionY) * -1).pow(1.0 / 11)
+
             linearVelX = powerX
             linearVelY = powerY
             runTelemetry(drive)
 
-            /*if (drive.pose.position.x < abX) {
-                drive.setDrivePowers(new PoseVelocity2d(new Vector2d(1, 0), 0));
-                runTelemetry(drive);
-            }*/
+
         }
     }
 
