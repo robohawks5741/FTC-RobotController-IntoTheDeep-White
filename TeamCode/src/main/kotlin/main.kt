@@ -6,31 +6,31 @@ import com.acmerobotics.roadrunner.Pose2d
 import com.acmerobotics.roadrunner.PoseVelocity2d
 import com.acmerobotics.roadrunner.Vector2d
 import com.qualcomm.hardware.rev.Rev2mDistanceSensor
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.DistanceSensor
 import com.qualcomm.robotcore.hardware.Servo
+import org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.teamcode.Drawing
 import org.firstinspires.ftc.teamcode.MecanumDrive
-import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer
 import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
-import kotlin.math.pow
+import kotlin.math.cos
 
-@Autonomous(name = "#Auto Main Kt")
-class Auto2 : LinearOpMode() {
+@TeleOp(name = "#Main")
+class main : LinearOpMode() {
     private val lift: DcMotorEx? = null
     private val leftRotate: DcMotorEx? = null
     private val rightRotate: DcMotorEx? = null
     private val rotate: Servo? = null
     private val left: Servo? = null
     private val right: Servo? = null
-    private val distanceFront: Rev2mDistanceSensor? = null
-
+    private val distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
     /**
      * The variable to store our instance of the AprilTag processor.
      */
@@ -40,43 +40,44 @@ class Auto2 : LinearOpMode() {
      * The variable to store our instance of the vision portal.
      */
     private var visionPortal: VisionPortal? = null
-
-    var linearVelX: Double = 0.0
-    var linearVelY: Double = 0.0
-    var angularVel: Double = 0.0
-
     @Throws(InterruptedException::class)
     override fun runOpMode() {
-        val drive = MecanumDrive(hardwareMap, Pose2d(0.0, 0.0, 0.0))
-        val twoDeadWheelLocalizer = TwoDeadWheelLocalizer(hardwareMap, drive.lazyImu.get(), 1870.0)
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
-
+        val drive = MecanumDrive(hardwareMap, Pose2d(0.0, 0.0, 0.0))
 
         initAprilTag()
-
+        var yAxisPower = 0.0
+        var xAxisPower = 0.0
+        var yawPower = 0.0
         var tagBearing = 0.0
         var tagRange = 0.0
         val tagYaw = 0.0
         val tagY = 0.0
         val tagX = 0.0
         val lastHeading = 0.0
-        val startX = drive.pose.position.x
-        val startY = drive.pose.position.y
-        var targetX: Double
-        var targetY: Double
-        var frontDist = distanceFront?.getDistance(DistanceUnit.CM)
         waitForStart()
-        resetRuntime()
         if (opModeIsActive()) {
             while (opModeIsActive()) { //Main loop
-
+                /*drive.setDrivePowers(new PoseVelocity2d(
+                        new Vector2d(
+                                -gamepad1.left_stick_y,
+                                -gamepad1.left_stick_x
+                        ),
+                        -gamepad1.right_stick_x
+                ));*/
                 telemetryAprilTag()
+                yAxisPower = gamepad1.left_stick_y.toDouble()
+                xAxisPower = gamepad1.left_stick_x.toDouble()
+                yawPower = -gamepad1.right_stick_x.toDouble()
+                var frontDist = distanceFront?.getDistance(DistanceUnit.CM)
 
-                driveToPosition(100.0, 0.0, drive, twoDeadWheelLocalizer)
+                if (frontDist != null) {
+                    if (frontDist < 10) {
 
-                driveToPosition(0.0, 100.0, drive, twoDeadWheelLocalizer)
+                    }
+                }
 
-                //Lift
+                //lift
                 val currentDetections: List<AprilTagDetection> = aprilTag!!.detections
                 if (!gamepad1.b) {
                     for (detection in currentDetections) {
@@ -90,67 +91,46 @@ class Auto2 : LinearOpMode() {
                     tagBearing = 0.0
                     tagRange = 0.0
                 }
+                val absoluteY = (cos((drive.pose.heading.toDouble() - 90) + tagBearing) * tagRange)
 
-
-
-                //double absoluteY = (Math.cos((drive.pose.heading.toDouble() - 90) + tagBearing)*tagRange);
-                if (runtime <= 3.00) {
-                    linearVelX = 1.0
-                }
-
-                //Final Drive Inputs
-                drive.setDrivePowers(
-                    PoseVelocity2d(
-                        Vector2d(linearVelX, linearVelY),
-                        angularVel
+                if (gamepad1.b) {
+                    drive.setDrivePowers(
+                        PoseVelocity2d(
+                            Vector2d(
+                                yAxisPower,
+                                tagBearing
+                            ), xAxisPower,
+                        )
                     )
-                ) //End of function call
+                }
+                else {
+                    drive.setDrivePowers(
+                        PoseVelocity2d(
+                            Vector2d(
+                                yAxisPower,
+                                -yawPower
+                            ), xAxisPower
+                        )
+                    )
+                }
+                drive.updatePoseEstimate()
+
+                telemetry.addLine(String.format("x", drive.pose.position.x))
+                telemetry.addLine(String.format("y", drive.pose.position.y))
+                telemetry.addLine(
+                    String.format(
+                        "%6.1f heading (deg)",
+                        Math.toDegrees(drive.pose.heading.toDouble())
+                    )
+                )
+                telemetry.update()
+
+                val packet = TelemetryPacket()
+                packet.fieldOverlay().setStroke("#3F51B5")
+                Drawing.drawRobot(packet.fieldOverlay(), drive.pose)
+                FtcDashboard.getInstance().sendTelemetryPacket(packet)
             }
         }
-    }
-
-    private fun driveToPosition(
-        abX: Double,
-        abY: Double,
-        drive: MecanumDrive,
-        twoDeadWheelLocalizer: TwoDeadWheelLocalizer
-    ) {
-        var positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
-        var positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
-
-        while (positionX != abX || positionY != abY) {
-            positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
-            positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
-
-            val powerX: Double = 0.53 * ((abX - positionX) * -1).pow(1.0 / 11)
-            val powerY: Double = 0.53 * ((abY - positionY) * -1).pow(1.0 / 11)
-
-            linearVelX = powerX
-            linearVelY = powerY
-            runTelemetry(drive)
-
-
-        }
-    }
-
-    private fun runTelemetry(drive: MecanumDrive) {
-        telemetry.addLine(String.format("%6.1f time", runtime))
-        telemetry.addLine(String.format("%6.1f Diffx", ((100 - drive.pose.position.x) * -1) / 1000))
-        //telemetry.addLine(String.format("%6.1f Pose X", drive.pose.position.x));
-        telemetry.addLine(String.format("%6.1f Pose X", drive.pose.position.x))
-        telemetry.addLine(String.format("%6.1f Pose Y", drive.pose.position.y))
-        telemetry.addLine(
-            String.format(
-                "%6.1f heading (deg)",
-                Math.toDegrees(drive.pose.heading.toDouble())
-            )
-        )
-        telemetryAprilTag()
-        telemetry.update()
-        val packet = TelemetryPacket()
-        packet.fieldOverlay().setStroke("#3F51B5")
-        Drawing.drawRobot(packet.fieldOverlay(), drive.pose)
-        FtcDashboard.getInstance().sendTelemetryPacket(packet)
     }
 
     private fun initAprilTag() {

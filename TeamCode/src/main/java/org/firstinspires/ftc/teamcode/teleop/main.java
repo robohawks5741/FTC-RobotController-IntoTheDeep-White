@@ -25,7 +25,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 
 
-@TeleOp(name = "#Main")
+@TeleOp(name = "#MainJs")
 
 public class main extends LinearOpMode {
 
