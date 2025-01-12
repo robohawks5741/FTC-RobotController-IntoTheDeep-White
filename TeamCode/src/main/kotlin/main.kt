@@ -17,10 +17,12 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.teamcode.Drawing
 import org.firstinspires.ftc.teamcode.MecanumDrive
+import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer
 import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
 import kotlin.math.cos
+import kotlin.math.pow
 
 @TeleOp(name = "#Main")
 class main : LinearOpMode() {
@@ -30,7 +32,8 @@ class main : LinearOpMode() {
     private val rotate: Servo? = null
     private val left: Servo? = null
     private val right: Servo? = null
-    private val distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
+    private lateinit var distanceFront: Rev2mDistanceSensor
+
     /**
      * The variable to store our instance of the AprilTag processor.
      */
@@ -39,11 +42,15 @@ class main : LinearOpMode() {
     /**
      * The variable to store our instance of the vision portal.
      */
+    var yAxisPower = 0.0
+    var xAxisPower = 0.0
+    var yawPower = 0.0
     private var visionPortal: VisionPortal? = null
     @Throws(InterruptedException::class)
     override fun runOpMode() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
         val drive = MecanumDrive(hardwareMap, Pose2d(0.0, 0.0, 0.0))
+        val twoDeadWheelLocalizer = TwoDeadWheelLocalizer(hardwareMap, drive.lazyImu.get(), 1870.0)
 
         initAprilTag()
         var yAxisPower = 0.0
@@ -55,6 +62,7 @@ class main : LinearOpMode() {
         val tagY = 0.0
         val tagX = 0.0
         val lastHeading = 0.0
+        distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
         waitForStart()
         if (opModeIsActive()) {
             while (opModeIsActive()) { //Main loop
@@ -69,13 +77,34 @@ class main : LinearOpMode() {
                 yAxisPower = gamepad1.left_stick_y.toDouble()
                 xAxisPower = gamepad1.left_stick_x.toDouble()
                 yawPower = -gamepad1.right_stick_x.toDouble()
-                var frontDist = distanceFront?.getDistance(DistanceUnit.CM)
-
-                if (frontDist != null) {
-                    if (frontDist < 10) {
-
+                var frontDist = distanceFront.getDistance(DistanceUnit.CM)
+                var yaw = (twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)%360
+                if (frontDist < 30) {
+                    telemetry.addLine(String.format("Close"))
+                    if (yAxisPower < 0.00) {
+                        yAxisPower = 0.00
                     }
+                }else if (frontDist < 55) {
+                    yAxisPower = 0.75*yAxisPower
                 }
+                else {
+                    telemetry.addLine(String.format("Not Close"))
+                }
+                /*if (frontDist < 16) {
+
+                    yAxisPower = 0.00
+                    if (yaw < 45) {
+                        driveToPosition(0.00, drive, twoDeadWheelLocalizer)
+                    } else if (yaw < 135) {
+                        driveToPosition(90.00, drive, twoDeadWheelLocalizer)
+                    } else if (yaw < 225) {
+                        driveToPosition(180.00, drive, twoDeadWheelLocalizer)
+                    } else if (yaw < 315) {
+                        driveToPosition(270.00, drive, twoDeadWheelLocalizer)
+                    } else if (yaw <= 315) {
+                        driveToPosition(0.00, drive, twoDeadWheelLocalizer)
+                    }
+                } */
 
                 //lift
                 val currentDetections: List<AprilTagDetection> = aprilTag!!.detections
@@ -98,8 +127,8 @@ class main : LinearOpMode() {
                         PoseVelocity2d(
                             Vector2d(
                                 yAxisPower,
-                                tagBearing
-                            ), xAxisPower,
+                                xAxisPower
+                            ), tagBearing,
                         )
                     )
                 }
@@ -108,8 +137,8 @@ class main : LinearOpMode() {
                         PoseVelocity2d(
                             Vector2d(
                                 yAxisPower,
-                                -yawPower
-                            ), xAxisPower
+                                xAxisPower
+                            ), -yawPower,
                         )
                     )
                 }
@@ -117,6 +146,7 @@ class main : LinearOpMode() {
 
                 telemetry.addLine(String.format("x", drive.pose.position.x))
                 telemetry.addLine(String.format("y", drive.pose.position.y))
+                telemetry.addLine(String.format("%6.1f Distance Front (CM)", frontDist))
                 telemetry.addLine(
                     String.format(
                         "%6.1f heading (deg)",
@@ -130,6 +160,34 @@ class main : LinearOpMode() {
                 Drawing.drawRobot(packet.fieldOverlay(), drive.pose)
                 FtcDashboard.getInstance().sendTelemetryPacket(packet)
             }
+        }
+    }
+
+    private fun driveToPosition(
+        targYaw: Double,
+        drive: MecanumDrive,
+        twoDeadWheelLocalizer: TwoDeadWheelLocalizer
+    ) {
+        //var positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
+        //var positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
+        var yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
+
+
+        while (yaw != targYaw) {
+            //positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
+            //positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
+            //yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
+
+            //val powerX: Double = 0.53 * ((abX - positionX) * -1).pow(1.0 / 11)
+            //val powerY: Double = 0.53 * ((abY - positionY) * -1).pow(1.0 / 11)
+            val powerYaw: Double = 0.53 * ((targYaw - yaw) * -1).pow(1.0/11)
+
+
+
+            //xAxisPower = powerX
+            //linearVelY = powerY
+            yawPower = powerYaw
+
         }
     }
 

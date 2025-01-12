@@ -9,6 +9,7 @@ import com.qualcomm.hardware.rev.Rev2mDistanceSensor
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.IMU
 import com.qualcomm.robotcore.hardware.Servo
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
@@ -29,7 +30,7 @@ class Auto2 : LinearOpMode() {
     private val rotate: Servo? = null
     private val left: Servo? = null
     private val right: Servo? = null
-    private val distanceFront: Rev2mDistanceSensor? = null
+    private lateinit var distanceFront: Rev2mDistanceSensor
 
     /**
      * The variable to store our instance of the AprilTag processor.
@@ -44,12 +45,17 @@ class Auto2 : LinearOpMode() {
     var linearVelX: Double = 0.0
     var linearVelY: Double = 0.0
     var angularVel: Double = 0.0
+    var startX: Double = 0.0
+    var startY: Double = 0.0
+
 
     @Throws(InterruptedException::class)
     override fun runOpMode() {
         val drive = MecanumDrive(hardwareMap, Pose2d(0.0, 0.0, 0.0))
         val twoDeadWheelLocalizer = TwoDeadWheelLocalizer(hardwareMap, drive.lazyImu.get(), 1870.0)
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
+        distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
+
 
 
         initAprilTag()
@@ -60,11 +66,12 @@ class Auto2 : LinearOpMode() {
         val tagY = 0.0
         val tagX = 0.0
         val lastHeading = 0.0
-        val startX = drive.pose.position.x
-        val startY = drive.pose.position.y
+        startX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
+        startY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
         var targetX: Double
         var targetY: Double
-        var frontDist = distanceFront?.getDistance(DistanceUnit.CM)
+        var frontDist = distanceFront.getDistance(DistanceUnit.CM)
+
         waitForStart()
         resetRuntime()
         if (opModeIsActive()) {
@@ -72,20 +79,20 @@ class Auto2 : LinearOpMode() {
 
                 telemetryAprilTag()
 
-                driveToPosition(100.0, 0.0, drive, twoDeadWheelLocalizer)
 
-                driveToPosition(0.0, 100.0, drive, twoDeadWheelLocalizer)
+
+               // driveToPosition(0.0, 10000.0, 0.00, drive, twoDeadWheelLocalizer)
 
                 //Lift
                 val currentDetections: List<AprilTagDetection> = aprilTag!!.detections
-                if (!gamepad1.b) {
-                    for (detection in currentDetections) {
-                        if (detection.id == 15 || detection.id == 11) {
-                            tagBearing = detection.ftcPose.bearing
-                            tagRange = detection.ftcPose.range
-                        }
+
+                for (detection in currentDetections) {
+                    if (detection.id == 15 || detection.id == 11) {
+                        tagBearing = detection.ftcPose.bearing
+                        tagRange = detection.ftcPose.range
                     }
                 }
+
                 if (currentDetections.isEmpty()) {
                     tagBearing = 0.0
                     tagRange = 0.0
@@ -94,17 +101,18 @@ class Auto2 : LinearOpMode() {
 
 
                 //double absoluteY = (Math.cos((drive.pose.heading.toDouble() - 90) + tagBearing)*tagRange);
-                if (runtime <= 3.00) {
-                    linearVelX = 1.0
-                }
+
 
                 //Final Drive Inputs
-                drive.setDrivePowers(
+               /* drive.setDrivePowers(
                     PoseVelocity2d(
                         Vector2d(linearVelX, linearVelY),
                         angularVel
                     )
-                ) //End of function call
+                ) //End of function call*/
+                driveToPosition(10000.0, 0.0, 0.00, drive, twoDeadWheelLocalizer)
+
+                drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY,linearVelX), angularVel))
             }
         }
     }
@@ -112,33 +120,43 @@ class Auto2 : LinearOpMode() {
     private fun driveToPosition(
         abX: Double,
         abY: Double,
+        targYaw: Double,
         drive: MecanumDrive,
         twoDeadWheelLocalizer: TwoDeadWheelLocalizer
     ) {
-        var positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
-        var positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
+        var positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()   - startX
+        var positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startY
+        var yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
 
-        while (positionX != abX || positionY != abY) {
-            positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
-            positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
 
-            val powerX: Double = 0.53 * ((abX - positionX) * -1).pow(1.0 / 11)
-            val powerY: Double = 0.53 * ((abY - positionY) * -1).pow(1.0 / 11)
+        while (positionX != abX || positionY != abY || yaw != targYaw) {
+            positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() -startX
+            positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startY
+            yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
+
+            val powerX: Double = (0.53 * (((abX - positionX) ).pow(1.0 / 11)))
+            val powerY: Double = (0.53 * (((abY - positionY) ).pow(1.0 / 11)))
+            val powerYaw: Double = 0.53 * ((targYaw - yaw) * -1).pow(1.0/11)
 
             linearVelX = powerX
             linearVelY = powerY
-            runTelemetry(drive)
+            angularVel = powerYaw
+
+            drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY,linearVelX), angularVel))
+            runTelemetry(drive, twoDeadWheelLocalizer)
 
 
         }
     }
 
-    private fun runTelemetry(drive: MecanumDrive) {
+    private fun runTelemetry(drive: MecanumDrive, twoDeadWheelLocalizer: TwoDeadWheelLocalizer) {
         telemetry.addLine(String.format("%6.1f time", runtime))
         telemetry.addLine(String.format("%6.1f Diffx", ((100 - drive.pose.position.x) * -1) / 1000))
         //telemetry.addLine(String.format("%6.1f Pose X", drive.pose.position.x));
-        telemetry.addLine(String.format("%6.1f Pose X", drive.pose.position.x))
-        telemetry.addLine(String.format("%6.1f Pose Y", drive.pose.position.y))
+        telemetry.addLine(String.format("%6.1f Pose X", twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() - startX))
+        telemetry.addLine(String.format("%6.1f Pose Y", twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startY))
+        telemetry.addLine(String.format("%6.1f Power X", linearVelX))
+        telemetry.addLine(String.format("%6.1f Power Y", linearVelY))
         telemetry.addLine(
             String.format(
                 "%6.1f heading (deg)",

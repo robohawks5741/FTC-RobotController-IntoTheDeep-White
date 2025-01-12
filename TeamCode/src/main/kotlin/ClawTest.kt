@@ -34,8 +34,6 @@ class ClawTest : LinearOpMode() {
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
-        leftDrive = hardwareMap.get(DcMotor::class.java, "left_drive")
-        rightDrive = hardwareMap.get(DcMotor::class.java, "right_drive")
         claw = hardwareMap.get(Servo::class.java, "claw")
 
         var clawAngle = claw.position
@@ -43,8 +41,7 @@ class ClawTest : LinearOpMode() {
         // To drive forward, most robots need the motor on one side to be reversed, because the axles point in opposite directions.
         // Pushing the left stick forward MUST make robot go forward. So adjust these two lines based on your first test drive.
         // Note: The settings here assume direct drive on left and right wheels.  Gear Reduction or 90 Deg drives may require direction flips
-        leftDrive.direction = DcMotorSimple.Direction.REVERSE
-        rightDrive.direction = DcMotorSimple.Direction.FORWARD
+
 
         val colorLocator = ColorBlobLocatorProcessor.Builder()
             .setTargetColorRange(ColorRange.BLUE) // use a predefined color match
@@ -97,10 +94,7 @@ class ClawTest : LinearOpMode() {
 
             // POV Mode uses left stick to go forward, and right stick to turn.
             // - This uses basic math to combine motions and is easier to drive straight.
-            val drive = -gamepad1.left_stick_y.toDouble()
-            val turn = gamepad1.right_stick_x.toDouble()
-            leftPower = Range.clip(drive + turn, -1.0, 1.0)
-            rightPower = Range.clip(drive - turn, -1.0, 1.0)
+
 
             // Tank Mode uses one stick to control each wheel.
             // - This requires no math, but it is hard to drive forward slowly and keep straight.
@@ -108,8 +102,7 @@ class ClawTest : LinearOpMode() {
             // rightPower = -gamepad1.right_stick_y ;
 
             // Send calculated power to wheels
-            leftDrive.power = leftPower
-            rightDrive.power = rightPower
+
             telemetry.addData("preview on/off", "... Camera Stream\n")
 
             // Read the current list
@@ -176,7 +169,7 @@ class ClawTest : LinearOpMode() {
             }
             // Show the elapsed game time and wheel power.
             telemetry.addData("Status", "Run Time: $runtime")
-            telemetry.addData("Motors", "left (%.2f), right (%.2f)", leftPower, rightPower)
+
             telemetry.update()
         }
 
