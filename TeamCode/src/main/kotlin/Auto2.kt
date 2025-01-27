@@ -13,6 +13,7 @@ import com.qualcomm.robotcore.hardware.IMU
 import com.qualcomm.robotcore.hardware.Servo
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
+import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
 import org.firstinspires.ftc.teamcode.Drawing
 import org.firstinspires.ftc.teamcode.MecanumDrive
@@ -20,6 +21,7 @@ import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer
 import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
+import kotlin.math.abs
 import kotlin.math.pow
 
 @Autonomous(name = "#Auto Main Kt")
@@ -45,8 +47,9 @@ class Auto2 : LinearOpMode() {
     var linearVelX: Double = 0.0
     var linearVelY: Double = 0.0
     var angularVel: Double = 0.0
-    var startX: Double = 0.0
-    var startY: Double = 0.0
+    private var startX: Double = 0.0
+    private var startY: Double = 0.0
+    private var startYaw: Double = 0.0
 
 
     @Throws(InterruptedException::class)
@@ -66,8 +69,9 @@ class Auto2 : LinearOpMode() {
         val tagY = 0.0
         val tagX = 0.0
         val lastHeading = 0.0
-        startX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
-        startY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
+        startX = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble()
+        startY = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()
+        startYaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
         var targetX: Double
         var targetY: Double
         var frontDist = distanceFront.getDistance(DistanceUnit.CM)
@@ -77,7 +81,7 @@ class Auto2 : LinearOpMode() {
         if (opModeIsActive()) {
             while (opModeIsActive()) { //Main loop
 
-                telemetryAprilTag()
+             //   telemetryAprilTag()
 
 
 
@@ -110,9 +114,11 @@ class Auto2 : LinearOpMode() {
                         angularVel
                     )
                 ) //End of function call*/
-                driveToPosition(10000.0, 0.0, 0.00, drive, twoDeadWheelLocalizer)
+                driveToPosition(-6000.00, 0.00, drive, twoDeadWheelLocalizer)
+                driveToAngle(45.00, drive,twoDeadWheelLocalizer)
+                //driveToPosition(-6000.00, 500.00, drive, twoDeadWheelLocalizer)
 
-                drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY,linearVelX), angularVel))
+               // drive.setDrivePowers(PoseVelocity2d(Vector2d(-linearVelY,-linearVelX), -0.25*(angularVel)))
             }
         }
     }
@@ -120,50 +126,125 @@ class Auto2 : LinearOpMode() {
     private fun driveToPosition(
         abX: Double,
         abY: Double,
-        targYaw: Double,
         drive: MecanumDrive,
         twoDeadWheelLocalizer: TwoDeadWheelLocalizer
     ) {
-        var positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble()   - startX
-        var positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startY
-        var yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
+        var positionX = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startX
+        var positionY = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() - startY
+
+        var powerX: Double
+        var powerY: Double
+        //var powerYaw: Double
+        var frontDist = distanceFront.getDistance(DistanceUnit.CM)
+
+        while (abs(positionX-abX) < 100|| abs(positionY-abY) < 100) {
+            positionX =
+                (twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startX)/10
+            positionY =
+                (twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() - startY)/10
+
+            telemetry.addLine(String.format("%6.1f Front Distance Sensor", frontDist))
+            //val powerX: Double = (0.53 * (((abX - positionX) ).pow(1.0 / 11)))
+            //val powerY: Double = (0.53 * (((abY - positionY) ).pow(1.0 / 11)))
+            frontDist = 30.0
+            //Sets the power to 0 if the front distance is below 20CM
+            if (frontDist <= 20) {
+                powerX = 0.00
+                powerY = 0.00
+
+            } else {
+                if (abs(positionX-abX) >= 20) {
+                    if ((positionX - abX) <= 0) {
+                        powerX = -0.025 * (abs(positionX - abX)).pow(1.0 / 3)
+                    } else {
+                        powerX = 0.025 * (abs(positionX - abX)).pow(1.0 / 3)
+                    }
+                } else {
+                    powerX = 0.0
+                }
+
+                if (abs(positionY-abY) >=20) {
+                    if ((positionY - abY) <= 0) {
+                        powerY = -0.025 * (abs(positionY - abY)).pow(1.0 / 3)
+                    } else {
+                        powerY = 0.025 * (abs(positionY - abY)).pow(1.0 / 3)
+                    }
+                }else {
+                    powerY = 0.0
+                }
+            }
 
 
-        while (positionX != abX || positionY != abY || yaw != targYaw) {
-            positionX = twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() -startX
-            positionY = twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startY
-            yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw
+            //powerYaw = 0.0 //temp for testing
+            //powerY = 0.0
+            linearVelX = (-1) * powerX
+            linearVelY = (-1) * powerY
 
-            val powerX: Double = (0.53 * (((abX - positionX) ).pow(1.0 / 11)))
-            val powerY: Double = (0.53 * (((abY - positionY) ).pow(1.0 / 11)))
-            val powerYaw: Double = 0.53 * ((targYaw - yaw) * -1).pow(1.0/11)
+            telemetry.addLine(String.format("%6.1f Power X", powerX))
+            telemetry.addLine(String.format("%6.1f Power Y", powerY))
+            telemetry.addLine(String.format("%6.1f MotorPow LF", (drive.leftFront.getCurrent(CurrentUnit.MILLIAMPS))))
+            telemetry.addLine(String.format("%6.1f MotorPow LB", drive.leftBack.getCurrent(CurrentUnit.MILLIAMPS)))
+            telemetry.addLine(String.format("%6.1f MotorPow RF", drive.rightFront.getCurrent(CurrentUnit.MILLIAMPS)))
+            telemetry.addLine(String.format("%6.1f MotorPow RB", drive.rightBack.getCurrent(CurrentUnit.MILLIAMPS)))
+            telemetry.addLine(String.format("%6.1f Pos X", positionX))
+            telemetry.addLine(String.format("%6.1f Pos Y", positionY))
+            telemetry.addLine(String.format("%6.1f Targ X", abX))
+            telemetry.addLine(String.format("%6.1f Targ Y", abY))
 
-            linearVelX = powerX
-            linearVelY = powerY
-            angularVel = powerYaw
 
-            drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY,linearVelX), angularVel))
             runTelemetry(drive, twoDeadWheelLocalizer)
+            drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY, linearVelX), 0.00))
+            if (abs(abX-positionX) <50  && abs(abY-positionY) < 50){
+                break
+            }
+
 
 
         }
     }
+    private fun driveToAngle(
+        targYaw: Double,
+        drive: MecanumDrive,
+        twoDeadWheelLocalizer: TwoDeadWheelLocalizer,
+    ) {
+        var yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)) - startYaw
+        var powerYaw: Double
+        while (abs(targYaw-yaw) >=10) {
+            yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)) - startYaw
+            if (abs(targYaw-yaw) >=5) {
+                if ((targYaw - yaw) <= 0) {
+                    powerYaw = -0.025 * (abs(targYaw - yaw)).pow(1.0 / 3)
+                } else {
+                    powerYaw = 0.025 * (abs(targYaw - yaw)).pow(1.0 / 3)
+                }
+            }else {
+                powerYaw = 0.0
+            }
+            angularVel = powerYaw
+            telemetry.addLine(String.format("%6.1f Pos Yaw", yaw))
+            telemetry.addLine(String.format("%6.1f Targ Yaw", targYaw))
+            telemetry.addLine(String.format("%6.1f Power Yaw", powerYaw))
+            runTelemetry(drive, twoDeadWheelLocalizer)
+            drive.setDrivePowers(PoseVelocity2d(Vector2d(0.00,0.00), angularVel))
+        }
 
+    }
     private fun runTelemetry(drive: MecanumDrive, twoDeadWheelLocalizer: TwoDeadWheelLocalizer) {
         telemetry.addLine(String.format("%6.1f time", runtime))
         telemetry.addLine(String.format("%6.1f Diffx", ((100 - drive.pose.position.x) * -1) / 1000))
         //telemetry.addLine(String.format("%6.1f Pose X", drive.pose.position.x));
-        telemetry.addLine(String.format("%6.1f Pose X", twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() - startX))
-        telemetry.addLine(String.format("%6.1f Pose Y", twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startY))
-        telemetry.addLine(String.format("%6.1f Power X", linearVelX))
-        telemetry.addLine(String.format("%6.1f Power Y", linearVelY))
+        telemetry.addLine(String.format("%6.1f Pose X", twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startX))
+        telemetry.addLine(String.format("%6.1f Pose Y", twoDeadWheelLocalizer.par.getPositionAndVelocity().position.toDouble() - startY))
+        telemetry.addLine(String.format("%6.1f Linear Vel X", linearVelX))
+        telemetry.addLine(String.format("%6.1f Linear Vel Y", linearVelY))
+        telemetry.addLine(String.format("%6.1f Yaw", (Math.toDegrees((twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw).toDouble()))%360))
         telemetry.addLine(
             String.format(
                 "%6.1f heading (deg)",
                 Math.toDegrees(drive.pose.heading.toDouble())
             )
         )
-        telemetryAprilTag()
+
         telemetry.update()
         val packet = TelemetryPacket()
         packet.fieldOverlay().setStroke("#3F51B5")

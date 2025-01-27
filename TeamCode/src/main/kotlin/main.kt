@@ -76,7 +76,7 @@ class main : LinearOpMode() {
                 telemetryAprilTag()
                 yAxisPower = gamepad1.left_stick_y.toDouble()
                 xAxisPower = gamepad1.left_stick_x.toDouble()
-                yawPower = -gamepad1.right_stick_x.toDouble()
+                yawPower = -gamepad1.right_stick_y.toDouble()
                 var frontDist = distanceFront.getDistance(DistanceUnit.CM)
                 var yaw = (twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)%360
                 if (frontDist < 30) {
@@ -85,7 +85,7 @@ class main : LinearOpMode() {
                         yAxisPower = 0.00
                     }
                 }else if (frontDist < 55) {
-                    yAxisPower = 0.75*yAxisPower
+                    yAxisPower *= (frontDist/100)
                 }
                 else {
                     telemetry.addLine(String.format("Not Close"))
