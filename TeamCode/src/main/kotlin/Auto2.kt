@@ -57,6 +57,7 @@ class Auto2 : LinearOpMode() {
         val drive = MecanumDrive(hardwareMap, Pose2d(0.0, 0.0, 0.0))
         val twoDeadWheelLocalizer = TwoDeadWheelLocalizer(hardwareMap, drive.lazyImu.get(), 1870.0)
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
+        telemetry.msTransmissionInterval = 50
         distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
 
 
@@ -146,14 +147,16 @@ class Auto2 : LinearOpMode() {
             telemetry.addLine(String.format("%6.1f Front Distance Sensor", frontDist))
             //val powerX: Double = (0.53 * (((abX - positionX) ).pow(1.0 / 11)))
             //val powerY: Double = (0.53 * (((abY - positionY) ).pow(1.0 / 11)))
-            frontDist = 30.0
+            frontDist = 30.0 //for testing purposes TODO:Remove this once distance sensor works
             //Sets the power to 0 if the front distance is below 20CM
             if (frontDist <= 20) {
                 powerX = 0.00
                 powerY = 0.00
 
             } else {
+                //Tolerance of 20
                 if (abs(positionX-abX) >= 20) {
+                    //Stops the math from breaking
                     if ((positionX - abX) <= 0) {
                         powerX = -0.025 * (abs(positionX - abX)).pow(1.0 / 3)
                     } else {
@@ -163,7 +166,9 @@ class Auto2 : LinearOpMode() {
                     powerX = 0.0
                 }
 
+                //Tolerance of 20
                 if (abs(positionY-abY) >=20) {
+                    //Stops the math from breaking
                     if ((positionY - abY) <= 0) {
                         powerY = -0.025 * (abs(positionY - abY)).pow(1.0 / 3)
                     } else {
@@ -177,6 +182,7 @@ class Auto2 : LinearOpMode() {
 
             //powerYaw = 0.0 //temp for testing
             //powerY = 0.0
+            //Sends the calculated power values to the inputs for the setDrivePowers
             linearVelX = (-1) * powerX
             linearVelY = (-1) * powerY
 
@@ -207,20 +213,23 @@ class Auto2 : LinearOpMode() {
         drive: MecanumDrive,
         twoDeadWheelLocalizer: TwoDeadWheelLocalizer,
     ) {
-        var yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)) - startYaw
+        //Current Yaw
+        var yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)) //- startYaw
         var powerYaw: Double
         while (abs(targYaw-yaw) >=10) {
-            yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)) - startYaw
-            if (abs(targYaw-yaw) >=5) {
+            yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw))// - startYaw
+
+            //Power curve
+            powerYaw = if (abs(targYaw-yaw) >=10) {
                 if ((targYaw - yaw) <= 0) {
-                    powerYaw = -0.025 * (abs(targYaw - yaw)).pow(1.0 / 3)
+                    -0.025 * (abs(targYaw - yaw)).pow(1.0 / 3)
                 } else {
-                    powerYaw = 0.025 * (abs(targYaw - yaw)).pow(1.0 / 3)
+                    0.025 * (abs(targYaw - yaw)).pow(1.0 / 3)
                 }
             }else {
-                powerYaw = 0.0
+                0.0
             }
-            angularVel = powerYaw
+            angularVel = powerYaw/180
             telemetry.addLine(String.format("%6.1f Pos Yaw", yaw))
             telemetry.addLine(String.format("%6.1f Targ Yaw", targYaw))
             telemetry.addLine(String.format("%6.1f Power Yaw", powerYaw))

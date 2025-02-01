@@ -8,6 +8,7 @@ import com.acmerobotics.roadrunner.Vector2d
 import com.qualcomm.hardware.rev.Rev2mDistanceSensor
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import com.qualcomm.robotcore.hardware.CRServo
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DistanceSensor
 import com.qualcomm.robotcore.hardware.Servo
@@ -30,7 +31,7 @@ class main : LinearOpMode() {
     private val leftRotate: DcMotorEx? = null
     private val rightRotate: DcMotorEx? = null
     private val rotate: Servo? = null
-    private val left: Servo? = null
+    private lateinit var clawDrive: CRServo
     private val right: Servo? = null
     private lateinit var distanceFront: Rev2mDistanceSensor
 
@@ -62,6 +63,7 @@ class main : LinearOpMode() {
         val tagY = 0.0
         val tagX = 0.0
         val lastHeading = 0.0
+        clawDrive = hardwareMap.get(CRServo::class.java, "clawDrive")
         distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
         waitForStart()
         if (opModeIsActive()) {
@@ -76,7 +78,7 @@ class main : LinearOpMode() {
                 telemetryAprilTag()
                 yAxisPower = gamepad1.left_stick_y.toDouble()
                 xAxisPower = gamepad1.left_stick_x.toDouble()
-                yawPower = -gamepad1.right_stick_y.toDouble()
+                yawPower = -gamepad1.right_stick_x.toDouble()
                 var frontDist = distanceFront.getDistance(DistanceUnit.CM)
                 var yaw = (twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)%360
                 if (frontDist < 30) {
@@ -105,7 +107,8 @@ class main : LinearOpMode() {
                         driveToPosition(0.00, drive, twoDeadWheelLocalizer)
                     }
                 } */
-
+                //Intake
+                clawDrive.power = 1.00
                 //lift
                 val currentDetections: List<AprilTagDetection> = aprilTag!!.detections
                 if (!gamepad1.b) {
