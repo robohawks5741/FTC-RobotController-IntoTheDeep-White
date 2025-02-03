@@ -229,10 +229,11 @@ class Auto2 : LinearOpMode() {
             }else {
                 0.0
             }
-            angularVel = powerYaw/180
+            angularVel = powerYaw
             telemetry.addLine(String.format("%6.1f Pos Yaw", yaw))
             telemetry.addLine(String.format("%6.1f Targ Yaw", targYaw))
             telemetry.addLine(String.format("%6.1f Power Yaw", powerYaw))
+            telemetry.addLine(String.format("%6.1f Angular Vel", angularVel))
             runTelemetry(drive, twoDeadWheelLocalizer)
             drive.setDrivePowers(PoseVelocity2d(Vector2d(0.00,0.00), angularVel))
         }

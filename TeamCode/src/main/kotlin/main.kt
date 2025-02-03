@@ -12,7 +12,9 @@ import com.qualcomm.robotcore.hardware.CRServo
 import com.qualcomm.robotcore.hardware.DcMotorEx
 import com.qualcomm.robotcore.hardware.DistanceSensor
 import com.qualcomm.robotcore.hardware.Servo
+import com.qualcomm.robotcore.util.SortOrder
 import org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap
+import org.firstinspires.ftc.robotcore.external.Telemetry
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit
@@ -22,6 +24,12 @@ import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer
 import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
+import org.firstinspires.ftc.vision.opencv.ColorBlobLocatorProcessor
+import org.firstinspires.ftc.vision.opencv.ColorRange
+import org.firstinspires.ftc.vision.opencv.ImageRegion
+import org.opencv.core.Point
+import java.util.Locale
+import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.pow
 
@@ -39,19 +47,21 @@ class main : LinearOpMode() {
      * The variable to store our instance of the AprilTag processor.
      */
     private var aprilTag: AprilTagProcessor? = null
-
+    private var colorLocator: ColorBlobLocatorProcessor? = null
     /**
      * The variable to store our instance of the vision portal.
      */
     var yAxisPower = 0.0
     var xAxisPower = 0.0
     var yawPower = 0.0
+    private lateinit var claw: Servo
     private var visionPortal: VisionPortal? = null
     @Throws(InterruptedException::class)
     override fun runOpMode() {
         telemetry = MultipleTelemetry(telemetry, FtcDashboard.getInstance().telemetry)
         val drive = MecanumDrive(hardwareMap, Pose2d(0.0, 0.0, 0.0))
         val twoDeadWheelLocalizer = TwoDeadWheelLocalizer(hardwareMap, drive.lazyImu.get(), 1870.0)
+
 
         initAprilTag()
         var yAxisPower = 0.0
@@ -63,10 +73,45 @@ class main : LinearOpMode() {
         val tagY = 0.0
         val tagX = 0.0
         val lastHeading = 0.0
+        var bPressed = false
+        var bIsPressed = false
         clawDrive = hardwareMap.get(CRServo::class.java, "clawDrive")
         distanceFront = hardwareMap.get(Rev2mDistanceSensor::class.java, "distanceFront")
         waitForStart()
         if (opModeIsActive()) {
+            var visionLocator = ConceptVisionColorLocator()
+            // Initialize the hardware variables. Note that the strings used here as parameters
+            // to 'get' must correspond to the names assigned during the robot configuration
+            // step (using the FTC Robot Controller app on the phone).
+            claw = hardwareMap.get(Servo::class.java, "claw")
+            claw.scaleRange(0.0625, .75)
+            var clawAngle: Double
+            /*
+            val colorLocator = ColorBlobLocatorProcessor.Builder()
+                .setTargetColorRange(ColorRange.BLUE) // use a predefined color match
+                .setContourMode(ColorBlobLocatorProcessor.ContourMode.EXTERNAL_ONLY) // exclude blobs inside blobs
+                .setRoi(
+                    ImageRegion.asUnityCenterCoordinates(
+                        -0.9,
+                        0.9,
+                        0.9,
+                        -0.9
+                    )
+                ) // search central 1/4 of camera view
+                .setDrawContours(true) // Show contours on the Stream Preview
+                .setBlurSize(5) // Smooth the transitions between different colors in image
+                .build() */
+           /* val portal = VisionPortal.Builder()
+                .addProcessor(colorLocator)
+                .setCameraResolution(Size(320, 240))
+                .setCamera(hardwareMap.get(WebcamName::class.java, "Webcam 1"))
+                .build() */
+            telemetry.msTransmissionInterval = 50 // Speed up telemetry updates, Just use for debugging.
+            telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE)
+            // Wait for the game to start (driver presses START)
+            var offset: Boolean
+            offset = false
+            var alignClaw = false
             while (opModeIsActive()) { //Main loop
                 /*drive.setDrivePowers(new PoseVelocity2d(
                         new Vector2d(
@@ -78,7 +123,7 @@ class main : LinearOpMode() {
                 telemetryAprilTag()
                 yAxisPower = gamepad1.left_stick_y.toDouble()
                 xAxisPower = gamepad1.left_stick_x.toDouble()
-                yawPower = -gamepad1.right_stick_x.toDouble()
+                yawPower = gamepad1.right_stick_x.toDouble()
                 var frontDist = distanceFront.getDistance(DistanceUnit.CM)
                 var yaw = (twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)%360
                 if (frontDist < 30) {
@@ -146,6 +191,156 @@ class main : LinearOpMode() {
                     )
                 }
                 drive.updatePoseEstimate()
+                clawAngle = claw.position
+                telemetry.addData("preview on/off", "... Camera Stream\n")
+
+                // Read the current list
+                val blobs = colorLocator?.blobs
+
+                ColorBlobLocatorProcessor.Util.filterByArea(
+                    50.0,
+                    40000.0,
+                    blobs
+                ) // filter out very small blobs.
+
+                ColorBlobLocatorProcessor.Util.sortByArea(SortOrder.DESCENDING, blobs);
+                if (blobs?.isNotEmpty() == true) {
+                    val boxfit = blobs.get(0)?.boxFit
+                    var targetPos = claw.position
+                    var lastAngle: Double
+
+                    /* if (abs(boxfit.angle.toInt() - clawAngle) < 10) {
+                         claw.position = clawAngle + boxfit.angle.toInt()
+                     }*/
+                    telemetry.addLine(" Area Density Aspect  Center")
+
+                    // Display the size (area) and center location for each Blob.
+
+                    // if (boxfit.angle >= 7.0 && 90.0 - boxfit.angle >= 7.0) {
+                    telemetry.addLine(String.format("%6.1f FormerClawAngle", clawAngle))
+
+                    telemetry.addLine(String.format("%6.1f ClawAngle", clawAngle))
+                    if (boxfit != null) {
+                        telemetry.addLine(String.format("%6.1f BoxAngle", boxfit.angle/180))
+                    }
+                    if (boxfit != null) {
+                        lastAngle = boxfit.angle
+                    }
+                    val myBoxCorners = arrayOfNulls<Point>(4)
+                    if (boxfit != null) {
+                        boxfit.points(myBoxCorners)
+                    }
+                    var boxAngle: Double
+                    /* TODO: Take the points 0 & 3, subtract the x of 0 from the x of 3. if its negative use trig to find angle and use that.
+                    TODO: If positive, do trig and subtract from 180.
+                    */
+
+                    if (gamepad1.b && bPressed == false) {
+                        bPressed = true
+                        bIsPressed = true
+                    }
+                    if (!gamepad1.b) {
+                        bIsPressed = false
+                    }
+                    if (bPressed == true && bIsPressed == false) {
+
+                    }
+                    if (gamepad1.b && bPressed == true && bIsPressed == false) {
+                         bPressed = false
+                    }
+                    if (myBoxCorners.isNotEmpty() && gamepad1.right_bumper) {
+                        if (boxfit?.boundingRect()?.height!! > boxfit.boundingRect()!!.width) {
+                            if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! < 0) {
+
+                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                                boxAngle = atan(trigRatio!!)
+                                telemetry.addLine("<0")
+                            } else if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! > 0) {
+                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                                val interAngle = (atan(trigRatio!!)) * 120
+                                boxAngle = 180 + interAngle
+                                telemetry.addLine(">0")
+                                telemetry.addLine(
+                                    String.format(
+                                        "%6.1f Intermediate Angle",
+                                        interAngle
+                                    )
+                                )
+                            } else {
+                                boxAngle = 0.0
+                            }
+                        } else {
+                            if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! < 0) {
+
+                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                                boxAngle = atan(trigRatio!!)
+                                telemetry.addLine("<0")
+                            } else if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! > 0) {
+                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                                val interAngle = (atan(trigRatio!!)) * 120
+                                boxAngle = 180 + interAngle
+                                telemetry.addLine(">0")
+                                telemetry.addLine(
+                                    String.format(
+                                        "%6.1f Intermediate Angle",
+                                        interAngle
+                                    )
+                                )
+                            } else {
+                                boxAngle = 0.0
+                            }
+                        }
+                        boxAngle /= 2
+                        telemetry.addLine(String.format("%6.1f Calculated Box Angle", boxAngle))
+
+
+                        targetPos = boxAngle/180
+                        if (gamepad1.x) {
+                            offset = true
+                        } else if (gamepad1.y) {
+                            offset = false
+                        }
+                        if (offset) {
+                            if (targetPos - 0.5 <0){
+                                targetPos += 0.5
+                            }else if (targetPos + 0.5 > 1) {
+                                targetPos -= 0.5
+                            }
+                        }
+
+
+                    }
+
+                    claw.position = targetPos
+                    telemetry.addLine(String.format("%6.1f TargetClawPosition", targetPos))
+                    telemetry.addLine(String.format("%6.1f ClawPosition", claw.position))
+
+                    for (b in blobs) {
+                        val boxFit = b.boxFit
+                        telemetry.addLine(
+                            String.format(
+                                Locale.US,
+                                "%6.1f,  %6.1f,   %6.1f,  (%3d,%3d), %6.1f",
+                                b.contourArea.toDouble(),
+                                b.density,
+                                b.aspectRatio,
+                                boxFit.center.x.toInt(),
+                                boxFit.center.y.toInt(),
+                                boxFit.angle
+
+                            )
+                        )
+                    }
+                    //sleep(20)
+                }
+                // Show the elapsed game time and wheel power.
+                telemetry.addData("Status", "Run Time: $runtime")
+
+                telemetry.update()
 
                 telemetry.addLine(String.format("x", drive.pose.position.x))
                 telemetry.addLine(String.format("y", drive.pose.position.y))
@@ -222,6 +417,7 @@ class main : LinearOpMode() {
         // Note: Decimation can be changed on-the-fly to adapt during a match.
         aprilTag?.setDecimation(3f)
 
+
         // Create the vision portal by using a builder.
         val builder = VisionPortal.Builder()
 
@@ -247,7 +443,22 @@ class main : LinearOpMode() {
         //builder.setAutoStopLiveView(false);
 
         // Set and enable the processor.
+        colorLocator = ColorBlobLocatorProcessor.Builder()
+            .setTargetColorRange(ColorRange.BLUE) // use a predefined color match
+            .setContourMode(ColorBlobLocatorProcessor.ContourMode.EXTERNAL_ONLY) // exclude blobs inside blobs
+            .setRoi(
+                ImageRegion.asUnityCenterCoordinates(
+                    -0.9,
+                    0.9,
+                    0.9,
+                    -0.9
+                )
+            ) // search central 1/4 of camera view
+            .setDrawContours(true) // Show contours on the Stream Preview
+            .setBlurSize(5) // Smooth the transitions between different colors in image
+            .build()
         builder.addProcessor(aprilTag)
+        builder.addProcessor(colorLocator)
 
         // Build the Vision Portal, using the above settings.
         visionPortal = builder.build()
