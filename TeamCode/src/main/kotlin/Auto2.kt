@@ -115,7 +115,7 @@ class Auto2 : LinearOpMode() {
                         angularVel
                     )
                 ) //End of function call*/
-                driveToPosition(-6000.00, 0.00, drive, twoDeadWheelLocalizer)
+               // driveToPosition(-6000.00, 0.00, drive, twoDeadWheelLocalizer)
                 driveToAngle(45.00, drive,twoDeadWheelLocalizer)
                 //driveToPosition(-6000.00, 500.00, drive, twoDeadWheelLocalizer)
 
@@ -158,9 +158,9 @@ class Auto2 : LinearOpMode() {
                 if (abs(positionX-abX) >= 20) {
                     //Stops the math from breaking
                     if ((positionX - abX) <= 0) {
-                        powerX = -0.025 * (abs(positionX - abX)).pow(1.0 / 3)
+                        powerX = -0.03 * (abs(positionX - abX)).pow(1.0 / 3)
                     } else {
-                        powerX = 0.025 * (abs(positionX - abX)).pow(1.0 / 3)
+                        powerX = 0.03 * (abs(positionX - abX)).pow(1.0 / 3)
                     }
                 } else {
                     powerX = 0.0
@@ -214,10 +214,10 @@ class Auto2 : LinearOpMode() {
         twoDeadWheelLocalizer: TwoDeadWheelLocalizer,
     ) {
         //Current Yaw
-        var yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw)) //- startYaw
+        var yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw //- startYaw
         var powerYaw: Double
         while (abs(targYaw-yaw) >=10) {
-            yaw = (Math.toDegrees(twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw))// - startYaw
+            yaw = twoDeadWheelLocalizer.imu.robotYawPitchRollAngles.yaw// - startYaw
 
             //Power curve
             powerYaw = if (abs(targYaw-yaw) >=10) {
@@ -229,7 +229,7 @@ class Auto2 : LinearOpMode() {
             }else {
                 0.0
             }
-            angularVel = powerYaw
+            angularVel = powerYaw*5
             telemetry.addLine(String.format("%6.1f Pos Yaw", yaw))
             telemetry.addLine(String.format("%6.1f Targ Yaw", targYaw))
             telemetry.addLine(String.format("%6.1f Power Yaw", powerYaw))
