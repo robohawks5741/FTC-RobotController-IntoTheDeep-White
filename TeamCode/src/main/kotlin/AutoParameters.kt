@@ -24,14 +24,16 @@ import org.firstinspires.ftc.vision.VisionPortal
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor
 import org.firstinspires.ftc.vision.opencv.ColorBlobLocatorProcessor
+import org.firstinspires.ftc.vision.opencv.ColorRange
+import org.firstinspires.ftc.vision.opencv.ImageRegion
 import org.opencv.core.Point
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.pow
 
-@Autonomous(name = "#Auto Red Right")
-class Auto2RL : LinearOpMode() {
+@Autonomous(name = "#Auto Params")
+class AutoParameters : LinearOpMode() {
 
     private val leftRotate: DcMotorEx? = null
     private val rightRotate: DcMotorEx? = null
@@ -81,7 +83,7 @@ class Auto2RL : LinearOpMode() {
 
         var liftExt = lift.currentPosition - liftStart
 
-
+        var clawAngle: Double
         initAprilTag()
 
         var tagBearing = 0.0
@@ -96,21 +98,25 @@ class Auto2RL : LinearOpMode() {
         var targetX: Double
         var targetY: Double
         var frontDist = distanceFront.getDistance(DistanceUnit.CM)
-
+        var offset = false
         waitForStart()
         resetRuntime()
         if (opModeIsActive()) {
             while (opModeIsActive()) { //Main loop
 
-             //   telemetryAprilTag()
+                //   telemetryAprilTag()
 
 
-
-               // driveToPosition(0.0, 10000.0, 0.00, drive, twoDeadWheelLocalizer)
+                // driveToPosition(0.0, 10000.0, 0.00, drive, twoDeadWheelLocalizer)
 
                 //Lift
 
-                telemetry.addLine(String.format("%6.1f lift EXT prev", lift.currentPosition.toDouble()))
+                telemetry.addLine(
+                    String.format(
+                        "%6.1f lift EXT prev",
+                        lift.currentPosition.toDouble()
+                    )
+                )
 
                 telemetry.addLine(String.format("%6.1f lift EXT", liftExt.toDouble()))
 
@@ -127,141 +133,137 @@ class Auto2RL : LinearOpMode() {
                     tagBearing = 0.0
                     tagRange = 0.0
                 }
+                driveToPosition(-6000.00, 0.00, drive, twoDeadWheelLocalizer)
+              //  driveToAngle(45.00, drive, twoDeadWheelLocalizer)
+                lift(-8400, liftStart)
 
-               // driveToPosition(-6000.00, 0.00, drive, twoDeadWheelLocalizer)
-                driveToAngle(45.00, drive,twoDeadWheelLocalizer)
-                liftExt = -8400
 
                 //Makes sure the lift does not exceed the maximum extension and start making expensive noises
-                if (liftExt < -8400 || liftExt > 0) {
-                    lift.targetPosition = liftExt + liftStart
-                }
-                telemetry.addLine(String.format("%6.1f lift EXT", lift.targetPosition.toDouble()))
-
-                val blobs = arrayListOf<ColorBlobLocatorProcessor.Blob>()
-                blobs.addAll(colorLocator?.blobs!!)
-                blobs.addAll(colorLocator2?.blobs!!)
-                ColorBlobLocatorProcessor.Util.filterByArea(
-                    50.0,
-                    40000.0,
-                    blobs
-                ) // filter out very small blobs.
-
-                ColorBlobLocatorProcessor.Util.sortByArea(SortOrder.DESCENDING, blobs);
-                if (blobs.isNotEmpty()) {
-                    val boxfit = blobs.get(0)?.boxFit
-                    var targetPos = claw.position
-                    telemetry.addLine(" Area Density Aspect  Center")
-
-                    // Display the size (area) and center location for each Blob.
-
-                    // if (boxfit.angle >= 7.0 && 90.0 - boxfit.angle >= 7.0) {
-                    telemetry.addLine(String.format("%6.1f FormerClawAngle", clawAngle))
-
-                    telemetry.addLine(String.format("%6.1f ClawAngle", clawAngle))
-                    if (boxfit != null) {
-                        telemetry.addLine(String.format("%6.1f BoxAngle", boxfit.angle/180))
-                    }
-                    val myBoxCorners = arrayOfNulls<Point>(4)
-                    if (boxfit != null) {
-                        boxfit.points(myBoxCorners)
-                    }
-                    var boxAngle: Double
-
-                    if (myBoxCorners.isNotEmpty() && gamepad1.right_bumper) {
-                        if (boxfit?.boundingRect()?.height!! > boxfit.boundingRect()!!.width) {
-                            if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! < 0) {
-
-                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
-                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
-                                boxAngle = atan(trigRatio!!)
-                                telemetry.addLine("<0")
-                            } else if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! > 0) {
-                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
-                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
-                                val interAngle = (atan(trigRatio!!)) * 120
-                                boxAngle = 180 + interAngle
-                                telemetry.addLine(">0")
-                                telemetry.addLine(
-                                    String.format(
-                                        "%6.1f Intermediate Angle",
-                                        interAngle
-                                    )
-                                )
-                            } else {
-                                boxAngle = 0.0
-                            }
-                        } else {
-                            if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! < 0) {
-
-                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
-                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
-                                boxAngle = atan(trigRatio!!)
-                                telemetry.addLine("<0")
-                            } else if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! > 0) {
-                                val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
-                                    ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
-                                val interAngle = (atan(trigRatio!!)) * 120
-                                boxAngle = 180 + interAngle
-                                telemetry.addLine(">0")
-                                telemetry.addLine(
-                                    String.format(
-                                        "%6.1f Intermediate Angle",
-                                        interAngle
-                                    )
-                                )
-                            } else {
-                                boxAngle = 0.0
-                            }
-                        }
-                        boxAngle /= 2
-                        telemetry.addLine(String.format("%6.1f Calculated Box Angle", boxAngle))
-                        targetPos = boxAngle/180
-                        if (gamepad1.x) {
-                            offset = true
-                        } else if (gamepad1.y) {
-                            offset = false
-                        }
-                        if (offset) {
-                            if (targetPos - 0.5 <0){
-                                targetPos += 0.5
-                            }else if (targetPos + 0.5 > 1) {
-                                targetPos -= 0.5
-                            }
-                        }
 
 
-                    }
-
-                    claw.position = targetPos
-                    telemetry.addLine(String.format("%6.1f TargetClawPosition", targetPos))
-                    telemetry.addLine(String.format("%6.1f ClawPosition", claw.position))
-
-                    for (b in blobs) {
-                        val boxFit = b.boxFit
-                        telemetry.addLine(
-                            String.format(
-                                Locale.US,
-                                "%6.1f,  %6.1f,   %6.1f,  (%3d,%3d), %6.1f",
-                                b.contourArea.toDouble(),
-                                b.density,
-                                b.aspectRatio,
-                                boxFit.center.x.toInt(),
-                                boxFit.center.y.toInt(),
-                                boxFit.angle
-
-                            )
-                        )
-                    }
-
-                //driveToPosition(-6000.00, 500.00, drive, twoDeadWheelLocalizer)
-
-               // drive.setDrivePowers(PoseVelocity2d(Vector2d(-linearVelY,-linearVelX), -0.25*(angularVel)))
             }
         }
     }
+    private fun lift(ext: Int, start: Int) {
+        if (ext < -8400 || ext > 0) {
+            lift.targetPosition = ext + start
+        }
+        telemetry.addLine(String.format("%6.1f lift EXT", lift.targetPosition.toDouble()))
 
-    fun driveToPosition(
+    }
+    private fun alignClaw () {
+        val clawAngle: Double = claw.position
+        val blobs = arrayListOf<ColorBlobLocatorProcessor.Blob>()
+        blobs.addAll(colorLocator?.blobs!!)
+        blobs.addAll(colorLocator2?.blobs!!)
+        ColorBlobLocatorProcessor.Util.filterByArea(
+            50.0,
+            40000.0,
+            blobs
+        ) // filter out very small blobs.
+
+        ColorBlobLocatorProcessor.Util.sortByArea(SortOrder.DESCENDING, blobs);
+        if (blobs.isNotEmpty()) {
+            val boxfit = blobs.get(0)?.boxFit
+            var targetPos = claw.position
+            telemetry.addLine(" Area Density Aspect  Center")
+
+            // Display the size (area) and center location for each Blob.
+
+            // if (boxfit.angle >= 7.0 && 90.0 - boxfit.angle >= 7.0) {
+            telemetry.addLine(String.format("%6.1f FormerClawAngle", clawAngle))
+
+            telemetry.addLine(String.format("%6.1f ClawAngle", clawAngle))
+            if (boxfit != null) {
+                telemetry.addLine(String.format("%6.1f BoxAngle", boxfit.angle / 180))
+            }
+            val myBoxCorners = arrayOfNulls<Point>(4)
+            if (boxfit != null) {
+                boxfit.points(myBoxCorners)
+            }
+            var boxAngle: Double
+
+            if (myBoxCorners.isNotEmpty() && gamepad1.right_bumper) {
+                if (boxfit?.boundingRect()?.height!! > boxfit.boundingRect()!!.width) {
+                    if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! < 0) {
+
+                        val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                            ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                        boxAngle = atan(trigRatio!!)
+                        telemetry.addLine("<0")
+                    } else if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! > 0) {
+                        val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                            ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                        val interAngle = (atan(trigRatio!!)) * 120
+                        boxAngle = 180 + interAngle
+                        telemetry.addLine(">0")
+                        telemetry.addLine(
+                            String.format(
+                                "%6.1f Intermediate Angle",
+                                interAngle
+                            )
+                        )
+                    } else {
+                        boxAngle = 0.0
+                    }
+                } else {
+                    if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! < 0) {
+
+                        val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                            ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                        boxAngle = atan(trigRatio!!)
+                        telemetry.addLine("<0")
+                    } else if (myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!! > 0) {
+                        val trigRatio = myBoxCorners[0]?.y?.minus(myBoxCorners[3]?.y!!)
+                            ?.div(myBoxCorners[3]?.x?.minus(myBoxCorners[0]?.x!!)!!)
+                        val interAngle = (atan(trigRatio!!)) * 120
+                        boxAngle = 180 + interAngle
+                        telemetry.addLine(">0")
+                        telemetry.addLine(
+                            String.format(
+                                "%6.1f Intermediate Angle",
+                                interAngle
+                            )
+                        )
+                    } else {
+                        boxAngle = 0.0
+                    }
+                }
+                boxAngle /= 2
+                telemetry.addLine(String.format("%6.1f Calculated Box Angle", boxAngle))
+                targetPos = boxAngle / 180
+
+
+
+            }
+
+            claw.position = targetPos
+            telemetry.addLine(String.format("%6.1f TargetClawPosition", targetPos))
+            telemetry.addLine(String.format("%6.1f ClawPosition", claw.position))
+
+            for (b in blobs) {
+                val boxFit = b.boxFit
+                telemetry.addLine(
+                    String.format(
+                        Locale.US,
+                        "%6.1f,  %6.1f,   %6.1f,  (%3d,%3d), %6.1f",
+                        b.contourArea.toDouble(),
+                        b.density,
+                        b.aspectRatio,
+                        boxFit.center.x.toInt(),
+                        boxFit.center.y.toInt(),
+                        boxFit.angle
+
+                    )
+                )
+            }
+
+            //driveToPosition(-6000.00, 500.00, drive, twoDeadWheelLocalizer)
+
+            // drive.setDrivePowers(PoseVelocity2d(Vector2d(-linearVelY,-linearVelX), -0.25*(angularVel)))
+        }
+    }
+    private fun driveToPosition(
         abX: Double,
         abY: Double,
         drive: MecanumDrive,
@@ -275,7 +277,7 @@ class Auto2RL : LinearOpMode() {
         //var powerYaw: Double
         var frontDist = distanceFront.getDistance(DistanceUnit.CM)
 
-        while (abs(positionX-abX) < 100|| abs(positionY-abY) < 100) {
+        while (0==0) {
             positionX =
                 (twoDeadWheelLocalizer.perp.getPositionAndVelocity().position.toDouble() - startX)/10
             positionY =
@@ -336,16 +338,16 @@ class Auto2RL : LinearOpMode() {
 
 
             runTelemetry(drive, twoDeadWheelLocalizer)
-            drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY, linearVelX), 0.00))
-            if (abs(abX-positionX) <50  && abs(abY-positionY) < 50){
+           // drive.setDrivePowers(PoseVelocity2d(Vector2d(linearVelY, linearVelX), 0.00))
+           /* if (abs(abX-positionX) <50  && abs(abY-positionY) < 50){
                 break
-            }
+            }*/
 
 
 
         }
     }
-    fun driveToAngle(
+    private fun driveToAngle(
         targYaw: Double,
         drive: MecanumDrive,
         twoDeadWheelLocalizer: TwoDeadWheelLocalizer,
@@ -376,7 +378,7 @@ class Auto2RL : LinearOpMode() {
         }
 
     }
-    fun runTelemetry(drive: MecanumDrive, twoDeadWheelLocalizer: TwoDeadWheelLocalizer) {
+    private fun runTelemetry(drive: MecanumDrive, twoDeadWheelLocalizer: TwoDeadWheelLocalizer) {
         telemetry.addLine(String.format("%6.1f time", runtime))
         telemetry.addLine(String.format("%6.1f Diffx", ((100 - drive.pose.position.x) * -1) / 1000))
         //telemetry.addLine(String.format("%6.1f Pose X", drive.pose.position.x));
@@ -398,8 +400,7 @@ class Auto2RL : LinearOpMode() {
         Drawing.drawRobot(packet.fieldOverlay(), drive.pose)
         FtcDashboard.getInstance().sendTelemetryPacket(packet)
     }
-
-    fun initAprilTag() {
+    private fun initAprilTag() {
         // Create the AprilTag processor.
 
         aprilTag =
@@ -427,12 +428,14 @@ class Auto2RL : LinearOpMode() {
         // Note: Decimation can be changed on-the-fly to adapt during a match.
         aprilTag?.setDecimation(3f)
 
+
         // Create the vision portal by using a builder.
+        //1st builder for april tags
         val builder = VisionPortal.Builder()
 
         // Set the camera (webcam vs. built-in RC phone camera).
         if (USE_WEBCAM) {
-            builder.setCamera(hardwareMap.get(WebcamName::class.java, "Webcam 1"))
+            builder.setCamera(hardwareMap.get(WebcamName::class.java, "Webcam 2"))
         } else {
             builder.setCamera(BuiltinCameraDirection.BACK)
         }
@@ -443,6 +446,8 @@ class Auto2RL : LinearOpMode() {
         // Enable the RC preview (LiveView).  Set "false" to omit camera monitoring.
         builder.enableLiveView(true)
 
+
+        //2nd builder for claw
         val builder2 = VisionPortal.Builder()
 
         // Set the camera (webcam vs. built-in RC phone camera).
@@ -466,16 +471,50 @@ class Auto2RL : LinearOpMode() {
         //builder.setAutoStopLiveView(false);
 
         // Set and enable the processor.
+        colorLocator = ColorBlobLocatorProcessor.Builder()
+            .setTargetColorRange(ColorRange.BLUE) // use a predefined color match
+            .setContourMode(ColorBlobLocatorProcessor.ContourMode.EXTERNAL_ONLY) // exclude blobs inside blobs
+            .setRoi(
+                ImageRegion.asUnityCenterCoordinates(
+                    -0.9,
+                    0.9,
+                    0.9,
+                    -0.9
+                )
+            ) // search central 1/4 of camera view
+            .setDrawContours(true) // Show contours on the Stream Preview
+            .setBlurSize(5) // Smooth the transitions between different colors in image
+            .build()
+        colorLocator2 = ColorBlobLocatorProcessor.Builder()
+            .setTargetColorRange(ColorRange.YELLOW) // use a predefined color match
+            .setContourMode(ColorBlobLocatorProcessor.ContourMode.EXTERNAL_ONLY) // exclude blobs inside blobs
+            .setRoi(
+                ImageRegion.asUnityCenterCoordinates(
+                    -0.9,
+                    0.9,
+                    0.9,
+                    -0.9
+                )
+            ) // search central 1/4 of camera view
+            .setDrawContours(true) // Show contours on the Stream Preview
+            .setBlurSize(5) // Smooth the transitions between different colors in image
+            .build()
         builder.addProcessor(aprilTag)
+        builder2.addProcessor(colorLocator)
+        builder2.addProcessor(colorLocator2)
 
         // Build the Vision Portal, using the above settings.
         visionPortal = builder.build()
+        visionPortal2 = builder2.build()
 
         // Disable or re-enable the aprilTag processor at any time.
         visionPortal?.setProcessorEnabled(aprilTag, true)
+        visionPortal2?.setProcessorEnabled(colorLocator, true)
+        visionPortal2?.setProcessorEnabled(colorLocator2, true)
     } // end method initAprilTag()
 
-    private fun telemetryAprilTag() {
+
+        private fun telemetryAprilTag() {
         val currentDetections: List<AprilTagDetection> = aprilTag!!.detections
 
         telemetry.addData("# AprilTags Detected", currentDetections.size)
